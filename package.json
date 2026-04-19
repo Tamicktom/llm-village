@@ -6,7 +6,12 @@
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "@ai-sdk/openai-compatible": "^2.0.41",
+    "@elysiajs/openapi": "^1.4.14",
+    "@openrouter/ai-sdk-provider": "^2.8.0",
+    "ai": "^6.0.168",
+    "elysia": "latest",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "bun-types": "latest"
