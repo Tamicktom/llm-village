@@ -9,7 +9,9 @@ import z from 'zod';
 import { env } from './env';
 
 //* Villagers
+import { AbstractVillager } from './village/villagers/base';
 import { Leader } from './village/villagers/leader';
+import { IsabelleBrulhart } from './village/villagers/isabelle-brulhart';
 
 const lmstudio = createOpenAICompatible({
   name: 'lmstudio',
@@ -18,6 +20,11 @@ const lmstudio = createOpenAICompatible({
 
 const model = lmstudio("google/gemma-4-e4b");
 
+const villagers: AbstractVillager[] = [
+  new Leader(),
+  new IsabelleBrulhart(),
+]
+
 const app = new Elysia()
   .use(openapi())
   .get("/", () => "Hello Elysia")
@@ -25,6 +32,8 @@ const app = new Elysia()
     "/chat",
     async (req) => {
       const leader = new Leader();
+      const isabelle = new IsabelleBrulhart();
+
       return leader.getResponse(req.body.message, model);
     },
     {
