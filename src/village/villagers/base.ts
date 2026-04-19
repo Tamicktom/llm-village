@@ -2,6 +2,9 @@
 import { tool, type LanguageModel, type ToolSet, generateText, type Tool } from "ai";
 import { z } from "zod";
 
+//* Local imports
+import type { DialogueTurn } from "../dialogue-types";
+
 export enum Gender {
     MALE = "MALE",
     FEMALE = "FEMALE",
@@ -22,7 +25,12 @@ export abstract class AbstractVillager {
     };
 
     abstract getResponse(message: string, model: LanguageModel): Promise<string>;
-    abstract respondTo(villager: AbstractVillager, message: string, model: LanguageModel): Promise<string>;
+    abstract respondTo(
+        villager: AbstractVillager,
+        message: string,
+        model: LanguageModel,
+        recentHistory: DialogueTurn[],
+    ): Promise<string>;
 }
 
 function getVillagerSystemPrompt(villager: AbstractVillager): string {
@@ -61,6 +69,7 @@ export class Villager extends AbstractVillager {
             description: "Retrieve the memory of the villager.",
             inputSchema: z.object({}),
             execute: async () => {
+                console.log("Retrieving memory of the villager " + this.name);
                 return this.retrieveMemory();
             },
         }),
@@ -70,6 +79,7 @@ export class Villager extends AbstractVillager {
                 memory: z.string(),
             }),
             execute: async (args) => {
+                console.log("Adding memory to the villager " + this.name + ": " + args.memory);
                 return this.addMemory(args.memory);
             },
         }),
@@ -77,6 +87,7 @@ export class Villager extends AbstractVillager {
             description: "Look around the villager.",
             inputSchema: z.object({}),
             execute: async () => {
+                console.log("Looking around the villager " + this.name);
                 return this.lookAround();
             },
         }),
@@ -87,6 +98,7 @@ export class Villager extends AbstractVillager {
                 y: z.number(),
             }),
             execute: async (args) => {
+                console.log("Going to the location " + args.x + ", " + args.y + " for the villager " + this.name);
                 return this.goTo(args.x, args.y);
             },
         }),
@@ -144,17 +156,34 @@ export class Villager extends AbstractVillager {
         return modelResponse.text;
     }
 
-    async respondTo(villager: AbstractVillager, message: string, model: LanguageModel): Promise<string> {
-        let systemPrompt = getVillagerSystemPrompt(villager);
-        systemPrompt += `
-        ${villager.name} has requested you to respond to the following message:
+    async respondTo(
+        villager: AbstractVillager,
+        message: string,
+        model: LanguageModel,
+        recentHistory: DialogueTurn[],
+    ): Promise<string> {
+        const historyBlock =
+            recentHistory.length > 0
+                ? `
+<conversation_history_with_counterparty>
+Earlier messages between you and ${villager.name} (oldest first, before what they just said in message below):
+${recentHistory.map((turn) => `${turn.speaker}: ${turn.text}`).join("\n")}
+</conversation_history_with_counterparty>
+`
+                : "";
 
-        <message>
-        ${message}
-        </message>
+        const systemPrompt = `${getVillagerSystemPrompt(this)}
 
-        Respond only with the message to send to ${villager.name}.
-        `;
+You are talking with ${villager.name}.
+${historyBlock}
+${villager.name} says:
+
+<message>
+${message}
+</message>
+
+Reply with only the words you say to ${villager.name}. No stage directions or quotation marks around the whole reply.`;
+
         const modelResponse = await generateText({
             model,
             messages: [
@@ -163,7 +192,6 @@ export class Villager extends AbstractVillager {
                     content: systemPrompt
                 }
             ],
-            // tools: this.tools,
         });
 
         return modelResponse.text;

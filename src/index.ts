@@ -2,14 +2,17 @@
 import { Elysia } from "elysia";
 import { openapi } from '@elysiajs/openapi';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { generateText } from 'ai';
 import z from 'zod';
 
 //* Environment variables
 import { env } from './env';
 
+//* Village
+import { runVillagerDialogue } from './village/dialogue-loop';
+import { appendDialogueToDialogsFile } from './village/dialogue-storage';
+
 //* Villagers
-import { AbstractVillager } from './village/villagers/base';
+import type { AbstractVillager } from './village/villagers/base';
 import { Leader } from './village/villagers/leader';
 import { IsabelleBrulhart } from './village/villagers/isabelle-brulhart';
 
@@ -31,14 +34,39 @@ const app = new Elysia()
   .post(
     "/chat",
     async (req) => {
-      const leader = new Leader();
-      const isabelle = new IsabelleBrulhart();
-
+      const leader = villagers[0];
       return leader.getResponse(req.body.message, model);
     },
     {
       body: z.object({
         message: z.string(),
+      }),
+    }
+  )
+  .post(
+    "/village/dialogue",
+    async (req) => {
+      const turns = await runVillagerDialogue({
+        model,
+        villagers,
+        seed: req.body.seed,
+        maxTurns: req.body.maxTurns,
+        startSpeakerIndex: req.body.startSpeakerIndex,
+      });
+
+      try {
+        await appendDialogueToDialogsFile(req.body.seed, turns);
+      } catch (err) {
+        console.error("Failed to append dialogue to dialogs.md:", err);
+      }
+
+      return turns;
+    },
+    {
+      body: z.object({
+        seed: z.string(),
+        maxTurns: z.number().int().min(1).max(100),
+        startSpeakerIndex: z.number().int().min(0).optional(),
       }),
     }
   )
