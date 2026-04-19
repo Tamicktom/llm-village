@@ -8,6 +8,9 @@ import z from 'zod';
 //* Environment variables
 import { env } from './env';
 
+//* Villagers
+import { Leader } from './village/villagers/leader';
+
 const lmstudio = createOpenAICompatible({
   name: 'lmstudio',
   baseURL: 'http://localhost:1234/v1',
@@ -21,22 +24,8 @@ const app = new Elysia()
   .post(
     "/chat",
     async (req) => {
-      const modelResponse = await generateText({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant that can answer questions and help with tasks.",
-          },
-          {
-            role: "user",
-            content: req.body.message,
-          }
-        ],
-        maxRetries: 3, //* Max retries for the model
-      });
-
-      return modelResponse.text;
+      const leader = new Leader();
+      return leader.getResponse(req.body.message, model);
     },
     {
       body: z.object({
